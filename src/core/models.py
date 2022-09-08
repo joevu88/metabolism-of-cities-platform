@@ -1,4 +1,5 @@
 from django.db import models
+from django.utils.functional import cached_property
 
 # Used for image resizing
 from stdimage.models import StdImageField
@@ -1138,6 +1139,37 @@ class LibraryItem(Record):
 
     class Meta:
         ordering = ["-year", "name"]
+
+    @cached_property
+    def default_unit(self):
+        return self.data.first().unit
+
+    @cached_property
+    def unit_type(self):
+        unit_types = set(
+            Data.objects.filter(source=self).values_list(
+                "unit__type", flat=True
+            )
+        )
+        if len(unit_types) != 1:
+            return None
+
+        return list(unit_types)[0]
+
+    @cached_property
+    def units(self):
+        unit_ids = set(
+            Data.objects.filter(source=self).values_list(
+                "unit_id", flat=True
+            )
+        )
+        return Unit.objects.filter(id__in=unit_ids)
+
+    @property
+    def convertable_units(self):
+        # if len(self.units) == 1:
+        #     return self.units
+        return Unit.objects.filter(type=self.unit_type)
 
     def get_absolute_url(self):
         if self.type_id == 31:
@@ -3011,6 +3043,20 @@ class DataViz(Record):
 
     class Meta:
         ordering = ["id"]
+
+    @cached_property
+    def convertable_units(self):
+        if self.source:
+            return self.source.convertable_units
+
+        return []
+
+    @cached_property
+    def default_unit(self):
+        if self.source:
+            return self.source.default_unit
+
+        return None
 
 class Milestone(Record):
     position = models.PositiveSmallIntegerField(db_index=True, help_text="Enter 0 to make this the annual summary")

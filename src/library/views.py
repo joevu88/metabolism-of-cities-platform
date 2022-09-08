@@ -17,6 +17,7 @@ import pytz
 from django.db.models import Q
 
 from core.mocfunctions import *
+from core.models import Unit
 
 #from folium import Map
 import folium
@@ -452,6 +453,13 @@ def item(request, id, show_export=True, space=None, layer=None, data_section_typ
 
 def data_json(request, id):
     info = available_library_items(request).get(pk=id)
+
+    convert_unit = None
+    if request.GET.get('unit_id'):
+        convert_unit = Unit.objects.filter(id=request.GET.get('unit_id')).first()
+    else:
+        convert_unit = Unit.objects.filter(id=info.get_dataviz_properties.get("unit_id")).first()
+
     data = info.data.filter(quantity__isnull=False)
     if "space" in request.GET:
         space = request.GET["space"]
@@ -495,12 +503,16 @@ def data_json(request, id):
             this_data = []
             for data_point in get_this_data:
                 # Should also swap out origin_space.name for a variable, somehow!
+                quantity = data_point.quantity
+                if convert_unit and data_point.unit != convert_unit:
+                    quantity = quantity * data_point.unit.multiplication_factor / convert_unit.multiplication_factor
+
                 if subdivision == "origin_space":
-                    this_data.append([data_point.origin_space.name, data_point.quantity])
+                    this_data.append([data_point.origin_space.name, quantity])
                 elif subdivision == "segment":
-                    this_data.append([data_point.segment_name, data_point.quantity])
+                    this_data.append([data_point.segment_name, quantity])
                 elif subdivision == "material":
-                    this_data.append([data_point.material_name, data_point.quantity])
+                    this_data.append([data_point.material_name, quantity])
 
             series.append({
                 "name": each[group_by],
@@ -537,7 +549,10 @@ def data_json(request, id):
             if stacked_field not in stacked_field_values:
                 stacked_field_values[stacked_field] = {}
 
-            stacked_field_values[stacked_field][x_axis_field] = each.quantity
+            quantity = each.quantity
+            if convert_unit and each.unit != convert_unit:
+                quantity = quantity * each.unit.multiplication_factor / convert_unit.multiplication_factor
+            stacked_field_values[stacked_field][x_axis_field] = quantity
 
         for each in stacked_fields:
             this_series = []
@@ -561,7 +576,7 @@ def data_json(request, id):
     json_object = {
         "x_axis": x_axis,
         "series": series,
-        "y_axis_label": unit,
+        "y_axis_label": convert_unit.name if convert_unit else unit,
         "top_level": top_level,
     }
     return JsonResponse(json_object, safe=False)

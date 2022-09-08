@@ -3175,7 +3175,6 @@ def chart_editor(request, id):
             info = DataViz.objects.create(name=source.name, source=source)
 
     secondary_viz_list = DataViz.objects.filter(source=source, is_secondary=True)
-
     if request.method == "POST":
         if info.is_secondary and "delete" in request.POST:
             info.delete()
@@ -3184,8 +3183,10 @@ def chart_editor(request, id):
         else:
             if not info.meta_data:
                 info.meta_data = {}
-            info.meta_data["properties"] = request.POST.dict()
-
+            request_data = request.POST.dict()
+            if "unit_id" in request_data:
+                request_data["unit_id"] = int(request_data["unit_id"])
+            info.meta_data["properties"] = request_data
             if request.POST.get("boundaries"):
                 # Let's make sure that there are actual boundaries in the ID that was entered
                 try:
