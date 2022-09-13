@@ -13,6 +13,9 @@ function createBar(data) {
         style: {
           color: "#212529"
         }
+      },
+      title: {
+        text: data.y_axis_label
       }
     },
     tooltip: {

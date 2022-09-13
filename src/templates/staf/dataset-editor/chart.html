@@ -237,6 +237,15 @@
               <input type="checkbox" class="custom-control-input" id="hide_nav_tabs" name="hide_nav_tabs" value="normal" {% if properties.hide_nav_tabs %}checked{% endif %}>
               <label class="custom-control-label" for="hide_nav_tabs">Hide top menu (with different chart options)</label>
             </div>
+
+            <label class="category mt-3">Unit</label>
+            <div>
+              <select class="custom-select col-md-3" id="unit-id" name="unit_id">
+                {% for unit in info.convertable_units %}
+                  <option value="{{unit.id}}" {% if properties.unit_id == unit.id %}selected{% endif %}>{{unit.name}}</option>
+                {% endfor %}
+              </select>
+            </div>
           </div>
 
           <button type="submit" class="btn btn-success" form="chart-form">
@@ -413,6 +422,7 @@
     let showDataLabels = {% if properties.data_labels %}true{% else %}false{% endif %};
     let showLegend = {% if properties.legend %}true{% else %}false{% endif %};
     let showIndividualColors = {% if properties.individual_colors %}true{% else %}false{% endif %};
+    let unitId = "{{ properties.unit_id }}";
 
     // function to gather user settings and generate dataset preview
     function generatePreview() {
@@ -438,6 +448,10 @@
       yAxisMin = $("#yaxis-range").is(":checked") ? $("#yaxis-min").val() : null;
       yAxisMax = $("#yaxis-range").is(":checked") ? $("#yaxis-max").val() : null;
       yAxisLabelText = $("#yaxis-label").is(":checked") ? $(".yaxis-label-text input").val() : " ";
+      unitName = $('#unit-id').find(":selected").text();
+      if (unitName) {
+        yAxisLabelText = unitName;
+      }
 
       // data labels
       showDataLabels = $("#data-labels").is(":checked") ? true : false;
@@ -489,34 +503,45 @@
         },
       }
 
-      // update chart
-      barChart.update(updatedSettings);
-      columnChart.update(updatedSettings);
-      lineChart.update(updatedSettings);
-      areaChart.update(updatedSettings);
-      pieChart.update(updatedSettings);
+      {% with link=PROJECT.slug|add:":library_data_json" %}
+        var json_url = "{% url link source.id %}{% if properties.space %}?space={{ properties.space }}{% endif %}";
+      {% endwith %}
+      unitId = $('#unit-id').find(":selected").val();
+      json_url = json_url + "?unit_id=" + unitId;
+      $.get(json_url, function(data) {
+        updatedSettings["series"] = data.series;
 
-      pieChart.update({
-        xAxis: {
-          lineColor: "transparent",
-          title: {
-            text: null,
-          },
-        },
-        yAxis: {
-          title: {
-            text: null,
-          }
-        },
-        plotOptions: {
-          series: {
-            colorByPoint: true,
-            dataLabels: {
-              enabled: true,
+        barChart.update(updatedSettings);
+        columnChart.update(updatedSettings);
+        lineChart.update(updatedSettings);
+        areaChart.update(updatedSettings);
+        pieChart.update(updatedSettings);
+
+        pieChart.update({
+          xAxis: {
+            lineColor: "transparent",
+            title: {
+              text: null,
             },
-          }
-        },
+          },
+          yAxis: {
+            title: {
+              text: null,
+            }
+          },
+          plotOptions: {
+            series: {
+              colorByPoint: true,
+              dataLabels: {
+                enabled: true,
+              },
+            }
+          },
+        });
       });
+
+      // update chart
+
 
       // only show enabled chart tabs
       $("#previews li.nav-item[data-chart!='table']").attr("hidden", "hidden");
@@ -699,7 +724,7 @@
       dataDefault = data;
       dataDefaultLoaded = true;
       $(".tab-pane[data-drilldown!='true']").removeClass("loading");
-      createViz("bar")
+      createViz("bar");
       createViz("column")
       createViz("line")
       createViz("area")
